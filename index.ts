@@ -14,15 +14,32 @@ server.on("request", (request: IncomingMessage, response: ServerResponse) => {
     const object = url.parse(path);
     //裸路径名
     const {pathname} = object;
-
     //请求处理
-    const filename = pathname.substr(1);
+    const filename = pathname.substr(1) || "index.html";
+
+    if (method !== "GET") {
+        response.statusCode = 405;
+        response.end("该服务器无法响应post请求");
+        return;
+    }
     fs.readFile(p.resolve(publicDir, filename), (error, data) => {
         if (error) {
-            response.statusCode = 400;
-            response.end();
+            if (error.errno === -4058) {
+                response.statusCode = 404;
+                fs.readFile(p.resolve(publicDir, "404.html"), (error, data) => {
+                    response.end(data);
+                });
+            } else if (error.errno === -4068) {
+                response.statusCode = 403;
+                response.end("无权访问");
+            } else {
+                response.statusCode = 500;
+                response.end("服务器繁忙请稍后重试");
+            }
         } else {
-            response.end(data.toString());
+            //返回数据,添加缓存
+            response.setHeader("Cache-Control", "public,max-age=3");
+            response.end(data);
         }
     });
 
